@@ -2,16 +2,20 @@
   "manifest_version": 3,
   "name": "Hotstar Ad Muter",
   "version": "1.0",
-  "description": "Mutes all ads on Hotstar by intercepting ad tracking requests",
-  "permissions": [
-    "webRequest",
-    "tabs"
-  ],
+  "description": "Mutes all ads on Hotstar",
+  "permissions": ["webRequest", "tabs"],
   "host_permissions": [
     "*://*.hotstar.com/*",
     "*://bifrost-api.hotstar.com/*"
   ],
   "background": {
     "service_worker": "background.js"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.hotstar.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }

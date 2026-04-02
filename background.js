@@ -1,22 +1,42 @@
 const durationRegexes = [
-    /_VCTA_(\d{1,3})/i,                            // "VCTA_30" ← most reliable
-    /(\d{1,3})s(?:Eng(?:lish)?|Hin(?:di)?)/i,      // "20sEng", "15sHindi"
+    /_VCTA_(\d{1,3})/i,
+    /(\d{1,3})s(?:Eng(?:lish)?|Hin(?:di)?)/i,
     /(?:HIN|ENG|HINDI|ENGLISH)_[^\d]*(\d{1,3})/i
 ];
 
 console.log("Hotstar Ad Muter loaded ✅");
 
+const muteTimers = new Map(); // tabId → timeoutId
+
+function unmuteTab(tabId) {
+    chrome.tabs.get(tabId, (tab) => {
+        if (tab && tab.mutedInfo.muted) {
+            chrome.tabs.update(tabId, { muted: false });
+            console.log("Unmuted ✅");
+        }
+    });
+    chrome.tabs.sendMessage(tabId, { type: "STOP_WATCHING" }).catch(() => {});
+    muteTimers.delete(tabId);
+}
+
+chrome.runtime.onMessage.addListener((msg, sender) => {
+    if (msg.type === "AD_ENDED_EARLY" && sender.tab?.id) {
+        console.log("Ad ended early — unmuting immediately");
+        const timer = muteTimers.get(sender.tab.id);
+        if (timer) clearTimeout(timer);
+        unmuteTab(sender.tab.id);
+    }
+});
+
 chrome.webRequest.onBeforeRequest.addListener(
     async (details) => {
         const url = new URL(details.url);
         const adName = url.searchParams.get("adName");
-
         if (!adName) return;
 
         console.log("Ad detected:", adName);
 
-        // Try to extract ad duration from the adName string
-        let durationSec = 15; // default fallback: 15 seconds
+        let durationSec = 15;
         for (const regex of durationRegexes) {
             const match = adName.match(regex);
             if (match) {
@@ -25,27 +45,26 @@ chrome.webRequest.onBeforeRequest.addListener(
             }
         }
 
-        console.log(`Muting for ${durationSec} seconds...`);
+        console.log(`Muting for up to ${durationSec} seconds...`);
 
-        // Find the Hotstar tab and mute it
         const tabs = await chrome.tabs.query({ url: "*://*.hotstar.com/*" });
         for (const tab of tabs) {
-            if (!tab.mutedInfo.muted) {
-                chrome.tabs.update(tab.id, { muted: true });
+            // Always mute regardless of current mute state
+            chrome.tabs.update(tab.id, { muted: true });
 
-                // Unmute after ad duration (with small buffer)
-                setTimeout(() => {
-                    chrome.tabs.get(tab.id, (updatedTab) => {
-                        if (updatedTab && updatedTab.mutedInfo.muted) {
-                            chrome.tabs.update(tab.id, { muted: false });
-                            console.log("Unmuted ✅");
-                        }
-                    });
-                }, (durationSec * 1000) + 1000);
+            // Tell content script to watch for early ad end
+            chrome.tabs.sendMessage(tab.id, { type: "WATCH_FOR_AD_END" }).catch(() => {});
+
+            // Cancel existing timer and reset — extends mute across back-to-back ads
+            const existing = muteTimers.get(tab.id);
+            if (existing) {
+                clearTimeout(existing);
+                console.log("Extended mute for next ad...");
             }
+
+            const timer = setTimeout(() => unmuteTab(tab.id), (durationSec * 1000) + 1000);
+            muteTimers.set(tab.id, timer);
         }
     },
-    {
-        urls: ["*://bifrost-api.hotstar.com/v1/events/track/ct_impression*"]
-    }
+    { urls: ["*://bifrost-api.hotstar.com/v1/events/track/ct_impression*"] }
 );
