@@ -39,4 +39,4 @@ PRs welcome! If you see an ad that isn't being muted, open the extension's servi
 
 ---
 
-> Built for IPL 2026 🏏 — because Vimal Elaichi ads deserve silence.
+> Built for IPL 2026 🏏 — because Vimal Elaichi ads deserve silence 🤣
