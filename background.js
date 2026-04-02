@@ -1,12 +1,12 @@
 const durationRegexes = [
     /_VCTA_(\d{1,3})/i,
     /(\d{1,3})s(?:Eng(?:lish)?|Hin(?:di)?)/i,
-    /(?:HIN|ENG|HINDI|ENGLISH)_[^\d]*(\d{1,3})/i
+    /(?:HIN|ENG|HINDI|ENGLISH)_\D*(\d{1,3})/i
 ];
 
 console.log("Hotstar Ad Muter loaded ✅");
 
-const muteTimers = new Map(); // tabId → timeoutId
+const muteTimers = new Map();
 
 function unmuteTab(tabId) {
     chrome.tabs.get(tabId, (tab) => {
