@@ -63,12 +63,11 @@ chrome.webRequest.onBeforeRequest.addListener(
             chrome.tabs.sendMessage(tab.id, { type: "WATCH_FOR_AD_END" }).catch(() => {});
 
             const existing = muteTimers.get(tab.id);
+            await addLog(`Ad detected: ${adName}`);
             if (existing) {
                 clearTimeout(existing);
-                await addLog(`Ad detected: ${adName}`);
                 await addLog(`Extended mute for next ad (${durationSec}s)...`);
             } else {
-                await addLog(`Ad detected: ${adName}`);
                 await addLog(`Muting for up to ${durationSec}s...`);
             }
 
