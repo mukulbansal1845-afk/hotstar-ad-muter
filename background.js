@@ -21,23 +21,22 @@ async function isEnabled() {
 
 addLog("Hotstar Ad Muter loaded ✅");
 
-function unmuteTab(tabId) {
-    chrome.tabs.get(tabId, (tab) => {
-        if (tab && tab.mutedInfo.muted) {
-            chrome.tabs.update(tabId, { muted: false });
-            addLog("Unmuted ✅");
-        }
-    });
+async function unmuteTab(tabId) {
+    const tab = await chrome.tabs.get(tabId).catch(() => null);
+    if (tab && tab.mutedInfo.muted) {
+        chrome.tabs.update(tabId, { muted: false });
+        await addLog("Unmuted ✅");
+    }
     chrome.tabs.sendMessage(tabId, { type: "STOP_WATCHING" }).catch(() => {});
     muteTimers.delete(tabId);
 }
 
 chrome.runtime.onMessage.addListener((msg, sender) => {
     if (msg.type === "AD_ENDED_EARLY" && sender.tab?.id) {
-        addLog("Ad ended early — unmuting immediately");
-        const timer = muteTimers.get(sender.tab.id);
+        const tabId = sender.tab.id;
+        const timer = muteTimers.get(tabId);
         if (timer) clearTimeout(timer);
-        unmuteTab(sender.tab.id);
+        addLog("Ad ended early — unmuting immediately").then(() => unmuteTab(tabId));
     }
 });
 
@@ -49,8 +48,6 @@ chrome.webRequest.onBeforeRequest.addListener(
         const adName = url.searchParams.get("adName");
         if (!adName) return;
 
-        addLog(`Ad detected: ${adName}`);
-
         let durationSec = 15;
         for (const regex of durationRegexes) {
             const match = adName.match(regex);
@@ -60,8 +57,6 @@ chrome.webRequest.onBeforeRequest.addListener(
             }
         }
 
-        addLog(`Muting for up to ${durationSec}s...`);
-
         const tabs = await chrome.tabs.query({ url: "*://*.hotstar.com/*" });
         for (const tab of tabs) {
             chrome.tabs.update(tab.id, { muted: true });
@@ -70,7 +65,11 @@ chrome.webRequest.onBeforeRequest.addListener(
             const existing = muteTimers.get(tab.id);
             if (existing) {
                 clearTimeout(existing);
-                addLog("Extended mute for next ad...");
+                await addLog(`Ad detected: ${adName}`);
+                await addLog(`Extended mute for next ad (${durationSec}s)...`);
+            } else {
+                await addLog(`Ad detected: ${adName}`);
+                await addLog(`Muting for up to ${durationSec}s...`);
             }
 
             const timer = setTimeout(() => unmuteTab(tab.id), (durationSec * 1000) + 1000);
