@@ -1,8 +1,8 @@
 const logList = document.getElementById("log-list");
 
 function classifyLog(msg) {
-    if (/muting/i.test(msg)) return "muted";
     if (/unmut/i.test(msg)) return "unmuted";
+    if (/mut/i.test(msg) || /ad detected/i.test(msg)) return "muted";
     return "info";
 }
 

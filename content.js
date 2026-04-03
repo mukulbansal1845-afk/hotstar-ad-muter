@@ -2,6 +2,7 @@ let cleanup = null;
 
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === "WATCH_FOR_AD_END") {
+        cleanup?.();
         const video = document.querySelector("video");
         if (!video) return;
 
