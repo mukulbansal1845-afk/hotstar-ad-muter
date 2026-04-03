@@ -16,12 +16,18 @@ function renderLogs(logs) {
         return;
     }
 
-    logList.innerHTML = [...logs].reverse().map(({ ts, msg }) => `
-        <div class="log-entry ${classifyLog(msg)}">
-            <span class="log-time">${formatTime(ts)}</span>
-            <span class="log-msg">${msg}</span>
-        </div>
-    `).join("");
+    const html = logs.flatMap(({ ts, msg }, i) => {
+        const node = `
+            <div class="flow-node ${classifyLog(msg)}">
+                <span class="dot"></span>
+                <span class="node-time">${formatTime(ts)}</span>
+                <span class="node-msg">${msg}</span>
+            </div>`;
+        const arrow = i < logs.length - 1 ? `<div class="flow-arrow">↓</div>` : "";
+        return [node, arrow];
+    });
+
+    logList.innerHTML = html.join("");
 }
 
 function load() {
@@ -39,4 +45,5 @@ chrome.storage.onChanged.addListener((changes, area) => {
         renderLogs(changes.swLogs.newValue || []);
     }
 });
+
 load();
