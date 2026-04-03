@@ -4,15 +4,28 @@ const durationRegexes = [
     /(?:HIN|ENG|HINDI|ENGLISH)_\D*(\d{1,3})/i
 ];
 
-console.log("Hotstar Ad Muter loaded ✅");
-
 const muteTimers = new Map();
+
+async function addLog(msg) {
+    console.log(msg);
+    const { swLogs = [] } = await chrome.storage.local.get("swLogs");
+    swLogs.push({ ts: Date.now(), msg });
+    if (swLogs.length > 200) swLogs.splice(0, swLogs.length - 200);
+    chrome.storage.local.set({ swLogs });
+}
+
+async function isEnabled() {
+    const { enabled } = await chrome.storage.local.get("enabled");
+    return enabled !== false;
+}
+
+addLog("Hotstar Ad Muter loaded ✅");
 
 function unmuteTab(tabId) {
     chrome.tabs.get(tabId, (tab) => {
         if (tab && tab.mutedInfo.muted) {
             chrome.tabs.update(tabId, { muted: false });
-            console.log("Unmuted ✅");
+            addLog("Unmuted ✅");
         }
     });
     chrome.tabs.sendMessage(tabId, { type: "STOP_WATCHING" }).catch(() => {});
@@ -21,7 +34,7 @@ function unmuteTab(tabId) {
 
 chrome.runtime.onMessage.addListener((msg, sender) => {
     if (msg.type === "AD_ENDED_EARLY" && sender.tab?.id) {
-        console.log("Ad ended early — unmuting immediately");
+        addLog("Ad ended early — unmuting immediately");
         const timer = muteTimers.get(sender.tab.id);
         if (timer) clearTimeout(timer);
         unmuteTab(sender.tab.id);
@@ -30,11 +43,13 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
 
 chrome.webRequest.onBeforeRequest.addListener(
     async (details) => {
+        if (!await isEnabled()) return;
+
         const url = new URL(details.url);
         const adName = url.searchParams.get("adName");
         if (!adName) return;
 
-        console.log("Ad detected:", adName);
+        addLog(`Ad detected: ${adName}`);
 
         let durationSec = 15;
         for (const regex of durationRegexes) {
@@ -45,21 +60,17 @@ chrome.webRequest.onBeforeRequest.addListener(
             }
         }
 
-        console.log(`Muting for up to ${durationSec} seconds... (${adName})`);
+        addLog(`Muting for up to ${durationSec}s...`);
 
         const tabs = await chrome.tabs.query({ url: "*://*.hotstar.com/*" });
         for (const tab of tabs) {
-            // Always mute regardless of current mute state
             chrome.tabs.update(tab.id, { muted: true });
-
-            // Tell content script to watch for early ad end
             chrome.tabs.sendMessage(tab.id, { type: "WATCH_FOR_AD_END" }).catch(() => {});
 
-            // Cancel existing timer and reset — extends mute across back-to-back ads
             const existing = muteTimers.get(tab.id);
             if (existing) {
                 clearTimeout(existing);
-                console.log("Extended mute for next ad...");
+                addLog("Extended mute for next ad...");
             }
 
             const timer = setTimeout(() => unmuteTab(tab.id), (durationSec * 1000) + 1000);

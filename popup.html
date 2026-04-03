@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hotstar Ad Muter</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 220px;
+      background: #0f0f1a;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      padding: 16px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    header .icon { font-size: 22px; }
+
+    header h1 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1.3;
+    }
+
+    header p {
+      font-size: 10px;
+      color: #888;
+    }
+
+    .toggle-btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      letter-spacing: 0.4px;
+    }
+
+    .toggle-btn.enabled {
+      background: #1db954;
+      color: #fff;
+    }
+
+    .toggle-btn.disabled {
+      background: #333;
+      color: #888;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .toggle-btn.enabled .status-dot { background: #fff; }
+    .toggle-btn.disabled .status-dot { background: #555; }
+
+    .logs-btn {
+      width: 100%;
+      margin-top: 10px;
+      padding: 9px;
+      border: 1px solid #2a2a3e;
+      border-radius: 8px;
+      background: transparent;
+      color: #aaa;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .logs-btn:hover {
+      border-color: #555;
+      color: #ddd;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="icon">🔇</span>
+    <div>
+      <h1>Hotstar Ad Muter</h1>
+      <p>Auto-mutes ads on Hotstar</p>
+    </div>
+  </header>
+
+  <button id="toggleBtn" class="toggle-btn enabled">
+    <span class="status-dot"></span>Enabled
+  </button>
+
+  <button id="logsBtn" class="logs-btn">📋 Open Logs</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
