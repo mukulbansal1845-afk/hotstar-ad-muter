@@ -1,3 +1,5 @@
+import { updateIcon } from "./icon.js";
+
 const durationRegexes = [
     /_VCTA_(\d{1,3})/i,
     /(\d{1,3})s(?:Eng(?:lish)?|Hin(?:di)?)/i,
@@ -18,6 +20,32 @@ async function isEnabled() {
     const { enabled } = await chrome.storage.local.get("enabled");
     return enabled !== false;
 }
+
+// Release all active mutes (called when user disables the extension)
+async function releaseAllMutes() {
+    for (const [, timer] of muteTimers) clearTimeout(timer);
+    muteTimers.clear();
+
+    const tabs = await chrome.tabs.query({ url: "*://*.hotstar.com/*" });
+    for (const tab of tabs) {
+        if (tab.mutedInfo?.muted) {
+            chrome.tabs.update(tab.id, { muted: false });
+        }
+        chrome.tabs.sendMessage(tab.id, { type: "STOP_WATCHING" }).catch(() => {});
+    }
+    await addLog("Extension disabled — released all mutes 🔊");
+}
+
+// React to enable/disable toggle from popup
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local" || !("enabled" in changes)) return;
+    const enabled = changes.enabled.newValue !== false;
+    updateIcon(enabled);
+    if (!enabled) releaseAllMutes();
+});
+
+// Set correct icon on service-worker startup
+isEnabled().then(updateIcon);
 
 addLog("Hotstar Ad Muter loaded ✅");
 
