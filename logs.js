@@ -39,5 +39,4 @@ chrome.storage.onChanged.addListener((changes, area) => {
         renderLogs(changes.swLogs.newValue || []);
     }
 });
-
 load();
