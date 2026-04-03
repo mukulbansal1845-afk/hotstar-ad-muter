@@ -45,7 +45,7 @@ chrome.webRequest.onBeforeRequest.addListener(
             }
         }
 
-        console.log(`Muting for up to ${durationSec} seconds...`);
+        console.log(`Muting for up to ${durationSec} seconds... (${adName})`);
 
         const tabs = await chrome.tabs.query({ url: "*://*.hotstar.com/*" });
         for (const tab of tabs) {
