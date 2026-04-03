@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ad Muter Logs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f0f1a;
+      color: #e0e0e0;
+      font-family: 'Cascadia Code', 'Consolas', monospace;
+      font-size: 13px;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      background: #13131f;
+      border-bottom: 1px solid #1e1e30;
+      position: sticky;
+      top: 0;
+    }
+
+    header h1 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid #2a2a3e;
+      background: transparent;
+      color: #aaa;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .btn:hover { border-color: #555; color: #ddd; }
+
+    .btn.danger { color: #e06c75; border-color: #3a2020; }
+    .btn.danger:hover { border-color: #e06c75; }
+
+    #log-list {
+      padding: 12px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .empty {
+      text-align: center;
+      color: #555;
+      padding: 60px 20px;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 12px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: #13131f;
+      border-left: 3px solid #2a2a3e;
+      line-height: 1.5;
+    }
+
+    .log-entry.muted   { border-left-color: #e06c75; }
+    .log-entry.unmuted { border-left-color: #1db954; }
+    .log-entry.info    { border-left-color: #528bff; }
+
+    .log-time {
+      color: #555;
+      white-space: nowrap;
+      flex-shrink: 0;
+      font-size: 11px;
+      padding-top: 2px;
+    }
+
+    .log-msg { color: #c8c8d4; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🔇 Service Worker Logs</h1>
+    <div class="actions">
+      <button class="btn" id="refreshBtn">↻ Refresh</button>
+      <button class="btn danger" id="clearBtn">Clear</button>
+    </div>
+  </header>
+  <div id="log-list"></div>
+
+  <script src="logs.js"></script>
+</body>
+</html>
