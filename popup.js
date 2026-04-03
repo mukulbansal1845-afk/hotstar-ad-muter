@@ -17,7 +17,7 @@ chrome.storage.local.get("enabled", ({ enabled }) => {
 
 toggleBtn.addEventListener("click", () => {
     chrome.storage.local.get("enabled", ({ enabled }) => {
-        const next = enabled === false ? true : false;
+        const next = enabled === false; // currently disabled → enable, otherwise disable
         chrome.storage.local.set({ enabled: next });
         setUI(next);
     });

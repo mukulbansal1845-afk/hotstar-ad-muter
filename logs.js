@@ -34,4 +34,10 @@ document.getElementById("clearBtn").addEventListener("click", () => {
     chrome.storage.local.set({ swLogs: [] }, load);
 });
 
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.swLogs) {
+        renderLogs(changes.swLogs.newValue || []);
+    }
+});
+
 load();
