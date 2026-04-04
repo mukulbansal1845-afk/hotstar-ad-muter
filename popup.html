@@ -87,6 +87,33 @@
       border-color: #555;
       color: #ddd;
     }
+
+    .bottom-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .bottom-row .logs-btn {
+      flex: 1;
+      margin-top: 0;
+    }
+
+    .reload-btn {
+      padding: 9px 12px;
+      border: 1px solid #2a2a3e;
+      border-radius: 8px;
+      background: transparent;
+      color: #aaa;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .reload-btn:hover {
+      border-color: #555;
+      color: #ddd;
+    }
   </style>
 </head>
 <body>
@@ -102,7 +129,10 @@
     <span class="status-dot"></span>Enabled
   </button>
 
-  <button id="logsBtn" class="logs-btn">📋 Open Logs</button>
+  <div class="bottom-row">
+    <button id="logsBtn" class="logs-btn">📋 Open Logs</button>
+    <button id="reloadBtn" class="reload-btn" title="Reload extension">↺</button>
+  </div>
 
   <script src="popup.js"></script>
 </body>

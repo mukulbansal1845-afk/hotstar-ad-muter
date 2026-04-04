@@ -26,3 +26,7 @@ toggleBtn.addEventListener("click", () => {
 logsBtn.addEventListener("click", () => {
     chrome.tabs.create({ url: chrome.runtime.getURL("logs.html") });
 });
+
+document.getElementById("reloadBtn").addEventListener("click", () => {
+    chrome.runtime.reload();
+});
