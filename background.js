@@ -22,7 +22,6 @@ async function isEnabled() {
 }
 
 // --- Mute state persistence ---
-// Saves muteUntil timestamp to storage so a restarted SW can recover it.
 
 function muteKey(tabId) { return `mute_${tabId}`; }
 
@@ -30,14 +29,11 @@ async function saveMuteDeadline(tabId, muteUntil) {
     await chrome.storage.local.set({ [muteKey(tabId)]: muteUntil });
 }
 
-async function clearMuteDeadline(tabId) {
-    await chrome.storage.local.remove(muteKey(tabId));
-}
-
-function scheduleMuteTimer(tabId, msRemaining) {
+// Schedule the in-memory timer. Carries the deadline so unmuteTab can verify it's still current.
+function scheduleMuteTimer(tabId, msRemaining, deadline) {
     const existing = muteTimers.get(tabId);
     if (existing) clearTimeout(existing);
-    const timer = setTimeout(() => unmuteTab(tabId, "timer"), msRemaining);
+    const timer = setTimeout(() => unmuteTab(tabId, "timer", deadline), msRemaining);
     muteTimers.set(tabId, timer);
 }
 
@@ -50,16 +46,29 @@ async function recoverMutes() {
         const tabId = parseInt(key.replace("mute_", ""), 10);
         const remaining = muteUntil - now;
         if (remaining <= 0) {
-            // Deadline already passed while SW was dead — unmute now.
-            unmuteTab(tabId, "timer");
+            // Deadline already passed — unmute, but only if a newer ad hasn't taken over.
+            unmuteTab(tabId, "timer", muteUntil);
         } else {
-            scheduleMuteTimer(tabId, remaining);
+            scheduleMuteTimer(tabId, remaining, muteUntil);
             await addLog(`Recovered mute for tab ${tabId} (${Math.ceil(remaining / 1000)}s left)`);
         }
     }
 }
 
-async function unmuteTab(tabId, reason = "timer") {
+// Unmute a tab.
+// expectedDeadline: the deadline this call is responsible for. If storage now holds a
+// *different* (newer) deadline it means a new ad fired concurrently — bail out so we
+// don't wipe the new deadline and leave the tab stuck muted after the next SW restart.
+async function unmuteTab(tabId, reason = "timer", expectedDeadline = null) {
+    if (expectedDeadline !== null) {
+        const stored = await chrome.storage.local.get(muteKey(tabId));
+        if (stored[muteKey(tabId)] !== expectedDeadline) {
+            // A newer ad updated the deadline — this unmute is stale, do nothing.
+            muteTimers.delete(tabId);
+            return;
+        }
+    }
+
     const tab = await chrome.tabs.get(tabId).catch(() => null);
     if (tab?.mutedInfo?.muted) {
         chrome.tabs.update(tabId, { muted: false });
@@ -67,7 +76,7 @@ async function unmuteTab(tabId, reason = "timer") {
     }
     chrome.tabs.sendMessage(tabId, { type: "STOP_WATCHING" }).catch(() => {});
     muteTimers.delete(tabId);
-    clearMuteDeadline(tabId);
+    chrome.storage.local.remove(muteKey(tabId));
 }
 
 // Release all active mutes (called when user disables the extension)
@@ -81,7 +90,7 @@ async function releaseAllMutes() {
             chrome.tabs.update(tab.id, { muted: false });
         }
         chrome.tabs.sendMessage(tab.id, { type: "STOP_WATCHING" }).catch(() => {});
-        clearMuteDeadline(tab.id);
+        chrome.storage.local.remove(muteKey(tab.id));
     }
     await addLog("Extension disabled — released all mutes 🔊");
 }
@@ -146,7 +155,7 @@ chrome.webRequest.onBeforeRequest.addListener(
             );
 
             await saveMuteDeadline(tab.id, muteUntil);
-            scheduleMuteTimer(tab.id, muteMs);
+            scheduleMuteTimer(tab.id, muteMs, muteUntil);
         }
     },
     { urls: ["*://bifrost-api.hotstar.com/v1/events/track/ct_impression*"] }
