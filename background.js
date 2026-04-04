@@ -99,6 +99,11 @@ isEnabled().then(updateIcon);
 recoverMutes();
 addLog("Hotstar Ad Muter loaded ✅");
 
+// Clear logs on extension reload (chrome://extensions → Reload button)
+chrome.runtime.onInstalled.addListener(() => {
+    chrome.storage.local.set({ swLogs: [] });
+});
+
 chrome.runtime.onMessage.addListener((msg, sender) => {
     if (msg.type === "AD_ENDED_EARLY" && sender.tab?.id) {
         const tabId = sender.tab.id;
