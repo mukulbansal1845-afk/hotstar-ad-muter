@@ -21,7 +21,8 @@ async function isEnabled() {
     return enabled !== false;
 }
 
-// --- Mute state persistence ---
+// --- Mute deadline persistence ---
+// Survives SW restarts; lets recoverMutes() pick up where we left off.
 
 function muteKey(tabId) { return `mute_${tabId}`; }
 
@@ -29,44 +30,44 @@ async function saveMuteDeadline(tabId, muteUntil) {
     await chrome.storage.local.set({ [muteKey(tabId)]: muteUntil });
 }
 
-// Schedule the in-memory timer. Carries the deadline so unmuteTab can verify it's still current.
-function scheduleMuteTimer(tabId, msRemaining, deadline) {
-    const existing = muteTimers.get(tabId);
-    if (existing) clearTimeout(existing);
-    const timer = setTimeout(() => unmuteTab(tabId, "timer", deadline), msRemaining);
-    muteTimers.set(tabId, timer);
-}
+// --- Keepalive ---
+// Chrome kills the SW after 30s of inactivity. Any Chrome API call resets that
+// clock. We poll every 20s while any mute is active so the SW stays alive and
+// in-memory setTimeout timers actually fire.
 
-// On startup, recover any mutes that were active before the SW was killed.
-async function recoverMutes() {
-    const all = await chrome.storage.local.get(null);
-    const now = Date.now();
-    for (const [key, muteUntil] of Object.entries(all)) {
-        if (!key.startsWith("mute_")) continue;
-        const tabId = parseInt(key.replace("mute_", ""), 10);
-        const remaining = muteUntil - now;
-        if (remaining <= 0) {
-            // Deadline already passed — unmute, but only if a newer ad hasn't taken over.
-            unmuteTab(tabId, "timer", muteUntil);
-        } else {
-            scheduleMuteTimer(tabId, remaining, muteUntil);
-            await addLog(`Recovered mute for tab ${tabId} (${Math.ceil(remaining / 1000)}s left)`);
-        }
-    }
-}
+let keepaliveInterval = null;
 
-// Unmute a tab.
-// expectedDeadline: the deadline this call is responsible for. If storage now holds a
-// *different* (newer) deadline it means a new ad fired concurrently — bail out so we
-// don't wipe the new deadline and leave the tab stuck muted after the next SW restart.
-async function unmuteTab(tabId, reason = "timer", expectedDeadline = null) {
-    if (expectedDeadline !== null) {
-        const stored = await chrome.storage.local.get(muteKey(tabId));
-        if (stored[muteKey(tabId)] !== expectedDeadline) {
-            // A newer ad updated the deadline — this unmute is stale, do nothing.
-            muteTimers.delete(tabId);
+function startKeepalive() {
+    if (keepaliveInterval !== null) return;
+    keepaliveInterval = setInterval(() => {
+        if (muteTimers.size === 0) {
+            clearInterval(keepaliveInterval);
+            keepaliveInterval = null;
             return;
         }
+        // Lightweight call — just enough to reset the idle timer.
+        chrome.tabs.query({ url: "*://*.hotstar.com/*" });
+    }, 20_000);
+}
+
+// --- Core mute / unmute ---
+
+function scheduleMuteTimer(tabId, msRemaining) {
+    const existing = muteTimers.get(tabId);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => unmuteTab(tabId, "timer"), msRemaining);
+    muteTimers.set(tabId, timer);
+    startKeepalive();
+}
+
+async function unmuteTab(tabId, reason = "timer") {
+    // If a fresh deadline is still well in the future a new ad arrived concurrently
+    // — this call is stale; leave the new deadline intact.
+    const stored = await chrome.storage.local.get(muteKey(tabId));
+    const deadline = stored[muteKey(tabId)];
+    if (deadline && deadline > Date.now() + 2000) {
+        muteTimers.delete(tabId);
+        return;
     }
 
     const tab = await chrome.tabs.get(tabId).catch(() => null);
@@ -79,16 +80,35 @@ async function unmuteTab(tabId, reason = "timer", expectedDeadline = null) {
     chrome.storage.local.remove(muteKey(tabId));
 }
 
+// On startup, recover any mutes that were active before the SW was killed.
+async function recoverMutes() {
+    const all = await chrome.storage.local.get(null);
+    const now = Date.now();
+    for (const [key, muteUntil] of Object.entries(all)) {
+        if (!key.startsWith("mute_")) continue;
+        const tabId = parseInt(key.replace("mute_", ""), 10);
+        const remaining = muteUntil - now;
+        if (remaining <= 0) {
+            unmuteTab(tabId, "timer");
+        } else {
+            scheduleMuteTimer(tabId, remaining);
+            await addLog(`Recovered mute for tab ${tabId} (${Math.ceil(remaining / 1000)}s left)`);
+        }
+    }
+}
+
 // Release all active mutes (called when user disables the extension)
 async function releaseAllMutes() {
+    if (keepaliveInterval !== null) {
+        clearInterval(keepaliveInterval);
+        keepaliveInterval = null;
+    }
     for (const [, timer] of muteTimers) clearTimeout(timer);
     muteTimers.clear();
 
     const tabs = await chrome.tabs.query({ url: "*://*.hotstar.com/*" });
     for (const tab of tabs) {
-        if (tab.mutedInfo?.muted) {
-            chrome.tabs.update(tab.id, { muted: false });
-        }
+        if (tab.mutedInfo?.muted) chrome.tabs.update(tab.id, { muted: false });
         chrome.tabs.sendMessage(tab.id, { type: "STOP_WATCHING" }).catch(() => {});
         chrome.storage.local.remove(muteKey(tab.id));
     }
@@ -155,7 +175,7 @@ chrome.webRequest.onBeforeRequest.addListener(
             );
 
             await saveMuteDeadline(tab.id, muteUntil);
-            scheduleMuteTimer(tab.id, muteMs, muteUntil);
+            scheduleMuteTimer(tab.id, muteMs);
         }
     },
     { urls: ["*://bifrost-api.hotstar.com/v1/events/track/ct_impression*"] }
