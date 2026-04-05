@@ -8,12 +8,19 @@ const durationRegexes = [
 
 const muteTimers = new Map();
 
+// In-memory log cache — avoids a storage.get on every addLog call.
+// Populated lazily on first write after the SW wakes up.
+let logCache = null;
+
 async function addLog(msg) {
     console.log(msg);
-    const { swLogs = [] } = await chrome.storage.local.get("swLogs");
-    swLogs.push({ ts: Date.now(), msg });
-    if (swLogs.length > 200) swLogs.splice(0, swLogs.length - 200);
-    chrome.storage.local.set({ swLogs });
+    if (logCache === null) {
+        const { swLogs = [] } = await chrome.storage.local.get("swLogs");
+        logCache = swLogs;
+    }
+    logCache.push({ ts: Date.now(), msg });
+    if (logCache.length > 200) logCache.splice(0, logCache.length - 200);
+    chrome.storage.local.set({ swLogs: logCache });
 }
 
 async function isEnabled() {
@@ -141,8 +148,8 @@ function scheduleDailyLogClean() {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "clearLogs") {
-        chrome.storage.local.set({ swLogs: [] });
-        addLog("Logs cleared (daily cleanup 2 AM) 🧹");
+        logCache = [{ ts: Date.now(), msg: "Logs cleared (daily cleanup 2 AM) 🧹" }];
+        chrome.storage.local.set({ swLogs: logCache });
     }
 });
 
@@ -154,6 +161,7 @@ addLog("Hotstar Ad Muter loaded ✅");
 
 // Clear logs on extension reload (chrome://extensions → Reload button)
 chrome.runtime.onInstalled.addListener(() => {
+    logCache = [];
     chrome.storage.local.set({ swLogs: [] });
 });
 
