@@ -123,9 +123,33 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (!enabled) releaseAllMutes();
 });
 
+// --- Daily log cleaner at 2 AM ---
+
+function scheduleDailyLogClean() {
+    chrome.alarms.get("clearLogs", (alarm) => {
+        if (alarm) return;
+        const now = new Date();
+        const next2AM = new Date(now);
+        next2AM.setHours(2, 0, 0, 0);
+        if (next2AM <= now) next2AM.setDate(next2AM.getDate() + 1);
+        chrome.alarms.create("clearLogs", {
+            when: next2AM.getTime(),
+            periodInMinutes: 1440
+        });
+    });
+}
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "clearLogs") {
+        chrome.storage.local.set({ swLogs: [] });
+        addLog("Logs cleared (daily cleanup 2 AM) 🧹");
+    }
+});
+
 // Startup
 isEnabled().then(updateIcon);
 recoverMutes();
+scheduleDailyLogClean();
 addLog("Hotstar Ad Muter loaded ✅");
 
 // Clear logs on extension reload (chrome://extensions → Reload button)
