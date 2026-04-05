@@ -23,9 +23,12 @@ async function addLog(msg) {
     chrome.storage.local.set({ swLogs: logCache });
 }
 
+let enabledCache = null;
+
 async function isEnabled() {
+    if (enabledCache !== null) return enabledCache;
     const { enabled } = await chrome.storage.local.get("enabled");
-    return enabled !== false;
+    return (enabledCache = enabled !== false);
 }
 
 // --- Mute deadline persistence ---
@@ -125,9 +128,9 @@ async function releaseAllMutes() {
 // React to enable/disable toggle from popup
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local" || !("enabled" in changes)) return;
-    const enabled = changes.enabled.newValue !== false;
-    updateIcon(enabled);
-    if (!enabled) releaseAllMutes();
+    enabledCache = changes.enabled.newValue !== false;
+    updateIcon(enabledCache);
+    if (!enabledCache) releaseAllMutes();
 });
 
 // --- Daily log cleaner at 2 AM ---
